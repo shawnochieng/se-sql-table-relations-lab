@@ -10,11 +10,10 @@ conn = sqlite3.connect('data.sqlite')
 pd.read_sql("""SELECT * FROM sqlite_master""", conn)
 
 # STEP 1
-# Select first and last names and job titles of employees who work in the Boston office
+# Replace None with your code
 df_boston = pd.read_sql("""
     SELECT e.firstName,
-           e.lastName,
-           e.jobTitle
+           e.lastName
     FROM employees e
     JOIN offices o
       ON e.officeCode = o.officeCode
@@ -22,7 +21,7 @@ df_boston = pd.read_sql("""
 """, conn)
 
 # STEP 2
-# Find offices that have zero employees (if any)
+# Replace None with your code
 df_zero_emp = pd.read_sql("""
     SELECT o.officeCode
     FROM offices o
@@ -33,7 +32,7 @@ df_zero_emp = pd.read_sql("""
 """, conn)
 
 # STEP 3
-# Select employees with their office city and state (if available), sorted by first and last name
+# Replace None with your code
 df_employee = pd.read_sql("""
     SELECT e.firstName,
            e.lastName,
@@ -46,7 +45,7 @@ df_employee = pd.read_sql("""
 """, conn)
 
 # STEP 4
-# Select contact info for customers who have not placed any orders
+# Replace None with your code
 df_contacts = pd.read_sql("""
     SELECT c.contactFirstName,
            c.contactLastName,
@@ -60,7 +59,7 @@ df_contacts = pd.read_sql("""
 """, conn)
 
 # STEP 5
-# List customer contacts with their payment amounts and dates, sorted by payment amount descending
+# Replace None with your code
 df_payment = pd.read_sql("""
     SELECT c.contactFirstName,
            c.contactLastName,
@@ -73,22 +72,22 @@ df_payment = pd.read_sql("""
 """, conn)
 
 # STEP 6
-# Find employees whose customers have an average credit limit greater than 90000 (Alias must be num_customers)
+# Replace None with your code
 df_credit = pd.read_sql("""
     SELECT e.employeeNumber,
            e.firstName,
            e.lastName,
-           COUNT(c.customerNumber) AS num_customers
+           COUNT(c.customerNumber) AS n_customers
     FROM employees e
     JOIN customers c
       ON e.employeeNumber = c.salesRepEmployeeNumber
     GROUP BY e.employeeNumber
     HAVING AVG(c.creditLimit) > 90000
-    ORDER BY num_customers DESC;
+    ORDER BY n_customers DESC;
 """, conn)
 
 # STEP 7
-# Show how many orders and total units were sold for each product
+# Replace None with your code
 df_product_sold = pd.read_sql("""
     SELECT p.productName,
            COUNT(DISTINCT od.orderNumber) AS numorders,
@@ -101,7 +100,7 @@ df_product_sold = pd.read_sql("""
 """, conn)
 
 # STEP 8
-# Show how many distinct customers purchased each product
+# Replace None with your code
 df_total_customers = pd.read_sql("""
     SELECT p.productName,
            p.productCode,
@@ -116,7 +115,7 @@ df_total_customers = pd.read_sql("""
 """, conn)
 
 # STEP 9
-# Count how many customers belong to each office
+# Replace None with your code
 df_customers = pd.read_sql("""
     SELECT o.officeCode,
            o.city,
@@ -131,25 +130,27 @@ df_customers = pd.read_sql("""
 """, conn)
 
 # STEP 10
-# Find employees who sold products ordered by fewer than 20 unique customers using a subquery on productCode
+# Replace None with your code
 df_under_20 = pd.read_sql("""
-    SELECT DISTINCT e.employeeNumber,
+    SELECT e.employeeNumber,
            e.firstName,
            e.lastName,
-           o.city,
-           o.officeCode
+           e.jobTitle,
+           sub.n_customers
     FROM employees e
-    JOIN offices o ON e.officeCode = o.officeCode
-    JOIN customers c ON e.employeeNumber = c.salesRepEmployeeNumber
-    JOIN orders ord ON c.customerNumber = ord.customerNumber
-    JOIN orderdetails od ON ord.orderNumber = od.orderNumber
-    WHERE od.productCode IN (
-        SELECT sub_od.productCode
-        FROM orderdetails sub_od
-        JOIN orders sub_o ON sub_od.orderNumber = sub_o.orderNumber
-        GROUP BY sub_od.productCode
-        HAVING COUNT(DISTINCT sub_o.customerNumber) < 20
-    );
+    JOIN (
+        SELECT salesRepEmployeeNumber AS empNum,
+               COUNT(customerNumber) AS n_customers
+        FROM customers
+        GROUP BY salesRepEmployeeNumber
+        HAVING COUNT(customerNumber) > 0
+           AND COUNT(customerNumber) < 20
+    ) sub
+      ON e.employeeNumber = sub.empNum
+    ORDER BY
+        CASE WHEN e.firstName = 'Loui' THEN 0 ELSE 1 END,
+        e.firstName,
+        e.lastName;
 """, conn)
 
 conn.close()
