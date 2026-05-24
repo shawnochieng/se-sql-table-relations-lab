@@ -10,10 +10,11 @@ conn = sqlite3.connect('data.sqlite')
 pd.read_sql("""SELECT * FROM sqlite_master""", conn)
 
 # STEP 1
-# Select first and last names of employees who work in the Boston office
+# Select first and last names and job titles of employees who work in the Boston office
 df_boston = pd.read_sql("""
     SELECT e.firstName,
-           e.lastName
+           e.lastName,
+           e.jobTitle
     FROM employees e
     JOIN offices o
       ON e.officeCode = o.officeCode
@@ -72,18 +73,18 @@ df_payment = pd.read_sql("""
 """, conn)
 
 # STEP 6
-# Find employees whose customers have an average credit limit greater than 90000
+# Find employees whose customers have an average credit limit greater than 90000 (Alias must be num_customers)
 df_credit = pd.read_sql("""
     SELECT e.employeeNumber,
            e.firstName,
            e.lastName,
-           COUNT(c.customerNumber) AS n_customers
+           COUNT(c.customerNumber) AS num_customers
     FROM employees e
     JOIN customers c
       ON e.employeeNumber = c.salesRepEmployeeNumber
     GROUP BY e.employeeNumber
     HAVING AVG(c.creditLimit) > 90000
-    ORDER BY n_customers DESC;
+    ORDER BY num_customers DESC;
 """, conn)
 
 # STEP 7
@@ -130,27 +131,25 @@ df_customers = pd.read_sql("""
 """, conn)
 
 # STEP 10
-# Use a subquery to find employees with fewer than 20 customers
+# Find employees who sold products ordered by fewer than 20 unique customers using a subquery on productCode
 df_under_20 = pd.read_sql("""
-    SELECT e.employeeNumber,
+    SELECT DISTINCT e.employeeNumber,
            e.firstName,
            e.lastName,
-           e.jobTitle,
-           sub.n_customers
+           o.city,
+           o.officeCode
     FROM employees e
-    JOIN (
-        SELECT salesRepEmployeeNumber AS empNum,
-               COUNT(customerNumber) AS n_customers
-        FROM customers
-        GROUP BY salesRepEmployeeNumber
-        HAVING COUNT(customerNumber) > 0
-           AND COUNT(customerNumber) < 20
-    ) sub
-      ON e.employeeNumber = sub.empNum
-    ORDER BY
-        CASE WHEN e.firstName = 'Loui' THEN 0 ELSE 1 END,
-        e.firstName,
-        e.lastName;
+    JOIN offices o ON e.officeCode = o.officeCode
+    JOIN customers c ON e.employeeNumber = c.salesRepEmployeeNumber
+    JOIN orders ord ON c.customerNumber = ord.customerNumber
+    JOIN orderdetails od ON ord.orderNumber = od.orderNumber
+    WHERE od.productCode IN (
+        SELECT sub_od.productCode
+        FROM orderdetails sub_od
+        JOIN orders sub_o ON sub_od.orderNumber = sub_o.orderNumber
+        GROUP BY sub_od.productCode
+        HAVING COUNT(DISTINCT sub_o.customerNumber) < 20
+    );
 """, conn)
 
 conn.close()
