@@ -12,63 +12,53 @@ pd.read_sql("""SELECT * FROM sqlite_master""", conn)
 # STEP 1
 df_boston = pd.read_sql("""
     SELECT 
-        employees.firstName, 
-        employees.lastName, 
-        employees.jobTitle
-    FROM 
-        employees
-    INNER JOIN 
-        offices ON employees.officeCode = offices.officeCode
-    WHERE 
-        offices.city = 'Boston';
+        e.firstName, 
+        e.lastName, 
+        e.jobTitle
+    FROM employees e
+    INNER JOIN offices o ON e.officeCode = o.officeCode
+    WHERE o.city = 'Boston';
 """, conn)
 
 # STEP 2
 df_zero_emp = pd.read_sql("""
     SELECT 
-        offices.officeCode,
-        offices.city
-    FROM 
-        offices
-    LEFT JOIN 
-        employees ON offices.officeCode = employees.officeCode
-    GROUP BY 
-        offices.officeCode
-    HAVING 
-        COUNT(employees.employeeNumber) = 0;
+        o.officeCode,
+        o.city
+    FROM offices o
+    LEFT JOIN employees e ON o.officeCode = e.officeCode
+    GROUP BY o.officeCode, o.city
+    HAVING COUNT(e.employeeNumber) = 0;
 """, conn)
 
 # STEP 3
 df_employee = pd.read_sql("""
     SELECT 
-        employees.firstName,
-        employees.lastName,
-        offices.city,
-        offices.state
+        e.firstName AS firstName,
+        e.lastName AS lastName,
+        o.city AS city,
+        o.state AS state
     FROM 
-        employees
+        employees e
     LEFT JOIN 
-        offices ON employees.officeCode = offices.officeCode
+        offices o ON e.officeCode = o.officeCode
     ORDER BY 
-        employees.firstName ASC,
-        employees.lastName ASC;
+        e.firstName ASC,
+        e.lastName ASC;
 """, conn)
 
 # STEP 4
 df_no_order = pd.read_sql("""
     SELECT 
-        customers.contactFirstName,
-        customers.contactLastName,
-        customers.phone,
-        customers.salesRepEmployeeNumber
+        c.customerName AS customerName,
+        c.phone AS phone,
+        c.salesRepEmployeeNumber AS salesRepEmployeeNumber
     FROM 
-        customers
+        customers c
     LEFT JOIN 
-        orders ON customers.customerNumber = orders.customerNumber
+        orders o ON c.customerNumber = o.customerNumber
     WHERE 
-        orders.orderNumber IS NULL
-    ORDER BY 
-        customers.contactLastName ASC;
+        o.orderNumber IS NULL;
 """, conn)
 
 # STEP 5
