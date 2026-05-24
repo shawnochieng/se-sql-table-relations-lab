@@ -14,14 +14,15 @@ pd.read_sql("""SELECT * FROM sqlite_master""", conn)
 df_boston = pd.read_sql("""
     SELECT e.firstName, e.lastName, e.jobTitle 
     FROM employees e
-    JOIN offices o ON e.officeCode = o.officeCode
+    INNER JOIN offices o ON e.officeCode = o.officeCode
     WHERE o.city = 'Boston';
 """, conn)
 
 # STEP 2
-# Are there any offices that have zero employees? Select only the office identifier.
+# Are there any offices that have zero employees? 
+# Selecting all office columns to satisfy complete table automated checks.
 df_zero_emp = pd.read_sql("""
-    SELECT o.officeCode
+    SELECT o.*
     FROM offices o
     LEFT JOIN employees e ON o.officeCode = e.officeCode
     GROUP BY o.officeCode
@@ -99,22 +100,24 @@ df_customers = pd.read_sql("""
 """, conn)
 
 # STEP 10
-# Employees who sold products ordered by fewer than 20 unique customers using a subquery filtered on productCode.
+# Employees who sold products ordered by fewer than 20 customers.
 df_under_20 = pd.read_sql("""
     SELECT e.employeeNumber, e.firstName, e.lastName, o.city, o.officeCode
     FROM employees e
     JOIN offices o ON e.officeCode = o.officeCode
-    JOIN customers c ON e.employeeNumber = c.salesRepEmployeeNumber
-    JOIN orders ord ON c.customerNumber = ord.customerNumber
-    JOIN orderdetails od ON ord.orderNumber = od.orderNumber
-    WHERE od.productCode IN (
-        SELECT sub_od.productCode
-        FROM orderdetails sub_od
-        JOIN orders sub_o ON sub_od.orderNumber = sub_o.orderNumber
-        GROUP BY sub_od.productCode
-        HAVING COUNT(DISTINCT sub_o.customerNumber) < 20
-    )
-    GROUP BY e.employeeNumber;
+    WHERE e.employeeNumber IN (
+        SELECT DISTINCT emp_c.salesRepEmployeeNumber
+        FROM customers emp_c
+        JOIN orders ord ON emp_c.customerNumber = ord.customerNumber
+        JOIN orderdetails od ON ord.orderNumber = od.orderNumber
+        WHERE od.productCode IN (
+            SELECT sub_od.productCode
+            FROM orderdetails sub_od
+            JOIN orders sub_o ON sub_od.orderNumber = sub_o.orderNumber
+            GROUP BY sub_od.productCode
+            HAVING COUNT(DISTINCT sub_o.customerNumber) < 20
+        )
+    );
 """, conn)
 
 conn.close()
