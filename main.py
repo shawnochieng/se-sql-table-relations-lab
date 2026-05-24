@@ -7,9 +7,7 @@ import pandas as pd
 # Connect to the database
 conn = sqlite3.connect('data.sqlite')
 
-pd.read_sql("""SELECT * FROM sqlite_master""", conn)
-
-# STEP 1
+# STEP 1: Boston Employees
 df_boston = pd.read_sql("""
     SELECT 
         e.firstName, 
@@ -20,7 +18,7 @@ df_boston = pd.read_sql("""
     WHERE o.city = 'Boston';
 """, conn)
 
-# STEP 2
+# STEP 2: Ghost Locations (Group by must list select expressions uniformly)
 df_zero_emp = pd.read_sql("""
     SELECT 
         o.officeCode,
@@ -31,13 +29,13 @@ df_zero_emp = pd.read_sql("""
     HAVING COUNT(e.employeeNumber) = 0;
 """, conn)
 
-# STEP 3
+# STEP 3: Employee Office Audit (Remove aliases so names match schema columns)
 df_employee = pd.read_sql("""
     SELECT 
-        e.firstName AS firstName,
-        e.lastName AS lastName,
-        o.city AS city,
-        o.state AS state
+        e.firstName,
+        e.lastName,
+        o.city,
+        o.state
     FROM 
         employees e
     LEFT JOIN 
@@ -47,135 +45,138 @@ df_employee = pd.read_sql("""
         e.lastName ASC;
 """, conn)
 
-# STEP 4
+# STEP 4: Customers with No Orders (Explicit alphabetical sorting by last name)
 df_no_order = pd.read_sql("""
     SELECT 
-        c.customerName AS customerName,
-        c.phone AS phone,
-        c.salesRepEmployeeNumber AS salesRepEmployeeNumber
+        c.contactFirstName,
+        c.contactLastName,
+        c.phone,
+        c.salesRepEmployeeNumber
     FROM 
         customers c
     LEFT JOIN 
         orders o ON c.customerNumber = o.customerNumber
     WHERE 
-        o.orderNumber IS NULL;
+        o.orderNumber IS NULL
+    ORDER BY
+        c.contactLastName ASC;
 """, conn)
 
-# STEP 5
+# STEP 5: Customer Payments Audit
 df_payments = pd.read_sql("""
     SELECT 
-        customers.contactFirstName,
-        customers.contactLastName,
-        payments.amount,
-        payments.paymentDate
+        c.contactFirstName,
+        c.contactLastName,
+        p.amount,
+        p.paymentDate
     FROM 
-        customers
+        customers c
     INNER JOIN 
-        payments ON customers.customerNumber = payments.customerNumber
+        payments p ON c.customerNumber = p.customerNumber
     ORDER BY 
-        CAST(payments.amount AS REAL) DESC;
+        CAST(p.amount AS REAL) DESC;
 """, conn)
 
-# STEP 6
+# STEP 6: High-Credit Sales Representatives
 df_top_reps = pd.read_sql("""
     SELECT 
-        employees.employeeNumber,
-        employees.firstName,
-        employees.lastName,
-        COUNT(customers.customerNumber) AS num_customers
+        e.employeeNumber,
+        e.firstName,
+        e.lastName,
+        COUNT(c.customerNumber) AS num_customers
     FROM 
-        employees
+        employees e
     INNER JOIN 
-        customers ON employees.employeeNumber = customers.salesRepEmployeeNumber
+        customers c ON e.employeeNumber = c.salesRepEmployeeNumber
     GROUP BY 
-        employees.employeeNumber
+        e.employeeNumber, e.firstName, e.lastName
     HAVING 
-        AVG(customers.creditLimit) > 90000
+        AVG(c.creditLimit) > 90000
     ORDER BY 
         num_customers DESC
     LIMIT 4;
 """, conn)
 
-# STEP 7
+# STEP 7: Top Selling Products
 df_top_products = pd.read_sql("""
     SELECT 
-        products.productName,
-        COUNT(orderdetails.orderNumber) AS numorders,
-        SUM(orderdetails.quantityOrdered) AS totalunits
+        p.productName,
+        COUNT(d.orderNumber) AS numorders,
+        SUM(d.quantityOrdered) AS totalunits
     FROM 
-        products
+        products p
     INNER JOIN 
-        orderdetails ON products.productCode = orderdetails.productCode
+        orderdetails d ON p.productCode = d.productCode
     GROUP BY 
-        products.productCode
+        p.productCode, p.productName
     ORDER BY 
         totalunits DESC;
 """, conn)
 
-# STEP 8
+# STEP 8: Market Reach (Unique Purchasers per Product)
 df_market_reach = pd.read_sql("""
     SELECT 
-        products.productName,
-        products.productCode,
-        COUNT(DISTINCT orders.customerNumber) AS numpurchasers
+        p.productName,
+        p.productCode,
+        COUNT(DISTINCT o.customerNumber) AS numpurchasers
     FROM 
-        products
+        products p
     INNER JOIN 
-        orderdetails ON products.productCode = orderdetails.productCode
+        orderdetails d ON p.productCode = d.productCode
     INNER JOIN 
-        orders ON orderdetails.orderNumber = orders.orderNumber
+        orders o ON d.orderNumber = o.orderNumber
     GROUP BY 
-        products.productCode
+        p.productCode, p.productName
     ORDER BY 
         numpurchasers DESC;
 """, conn)
 
-# STEP 9
+# STEP 9: Customer Density per Office
 df_office_customers = pd.read_sql("""
     SELECT 
-        COUNT(customers.customerNumber) AS n_customers,
-        offices.officeCode,
-        offices.city
+        COUNT(c.customerNumber) AS n_customers,
+        o.officeCode,
+        o.city
     FROM 
-        offices
+        offices o
     INNER JOIN 
-        employees ON offices.officeCode = employees.officeCode
+        employees e ON o.officeCode = e.officeCode
     INNER JOIN 
-        customers ON employees.employeeNumber = customers.salesRepEmployeeNumber
+        customers c ON e.employeeNumber = c.salesRepEmployeeNumber
     GROUP BY 
-        offices.officeCode;
+        o.officeCode, o.city;
 """, conn)
 
-# STEP 10
+# STEP 10: Underperforming Products Subquery
 df_low_performers = pd.read_sql("""
     SELECT DISTINCT
-        employees.employeeNumber,
-        employees.firstName,
-        employees.lastName,
-        offices.city,
-        offices.officeCode
+        e.employeeNumber,
+        e.firstName,
+        e.lastName,
+        o.city,
+        o.officeCode
     FROM 
-        employees
+        employees e
     INNER JOIN 
-        offices ON employees.officeCode = offices.officeCode
+        offices o ON e.officeCode = o.officeCode
     INNER JOIN 
-        customers ON employees.employeeNumber = customers.salesRepEmployeeNumber
+        customers c ON e.employeeNumber = c.salesRepEmployeeNumber
     INNER JOIN 
-        orders ON customers.customerNumber = orders.customerNumber
+        orders ord ON c.customerNumber = ord.customerNumber
     INNER JOIN 
-        orderdetails ON orders.orderNumber = orderdetails.orderNumber
+        orderdetails d ON ord.orderNumber = d.orderNumber
     WHERE 
-        orderdetails.productCode IN (
+        d.productCode IN (
             SELECT 
-                orderdetails.productCode
+                sub_d.productCode
             FROM 
-                orderdetails
+                orderdetails sub_d
             INNER JOIN 
-                orders ON orderdetails.orderNumber = orders.orderNumber
+                orders sub_ord ON sub_d.orderNumber = sub_ord.orderNumber
             GROUP BY 
-                orderdetails.productCode
+                sub_d.productCode
             HAVING 
-                COUNT(DISTINCT orders.customerNumber) < 20
+                COUNT(DISTINCT sub_ord.customerNumber) < 20
         );
 """, conn)
 
