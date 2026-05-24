@@ -19,9 +19,9 @@ df_boston = pd.read_sql("""
 """, conn)
 
 # STEP 2
-# Are there any offices that have zero employees? Filter using a HAVING statement.
+# Are there any offices that have zero employees? Select only the office identifier.
 df_zero_emp = pd.read_sql("""
-    SELECT o.officeCode, o.city
+    SELECT o.officeCode
     FROM offices o
     LEFT JOIN employees e ON o.officeCode = e.officeCode
     GROUP BY o.officeCode
@@ -99,9 +99,9 @@ df_customers = pd.read_sql("""
 """, conn)
 
 # STEP 10
-# Employees who sold products ordered by fewer than 20 unique customers using a subquery.
+# Employees who sold products ordered by fewer than 20 unique customers using a subquery filtered on productCode.
 df_under_20 = pd.read_sql("""
-    SELECT DISTINCT e.employeeNumber, e.firstName, e.lastName, o.city, o.officeCode
+    SELECT e.employeeNumber, e.firstName, e.lastName, o.city, o.officeCode
     FROM employees e
     JOIN offices o ON e.officeCode = o.officeCode
     JOIN customers c ON e.employeeNumber = c.salesRepEmployeeNumber
@@ -113,7 +113,8 @@ df_under_20 = pd.read_sql("""
         JOIN orders sub_o ON sub_od.orderNumber = sub_o.orderNumber
         GROUP BY sub_od.productCode
         HAVING COUNT(DISTINCT sub_o.customerNumber) < 20
-    );
+    )
+    GROUP BY e.employeeNumber;
 """, conn)
 
 conn.close()
